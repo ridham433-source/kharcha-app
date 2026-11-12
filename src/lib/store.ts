@@ -185,6 +185,32 @@ export function createGroup(name: string, emoji: string, otherNames: string[]): 
   return group.id;
 }
 
+/** A Khata ledger: a two-person group (you and one friend) that tracks who owes whom. */
+export function createFriend(friendName: string): ID {
+  const now = Date.now();
+  const name = friendName.trim() || 'Friend';
+  const me: Member = { id: uid(), name: getState().settings.userName || 'Me', updatedAt: now };
+  const them: Member = { id: uid(), name, updatedAt: now };
+  const group: Group = {
+    id: uid(),
+    name,
+    emoji: '🤝',
+    kind: 'friend',
+    createdAt: now,
+    metaUpdatedAt: now,
+    updatedAt: now,
+    members: [me, them],
+    expenses: [],
+    payments: [],
+  };
+  setState((s) => ({
+    ...s,
+    groups: [group, ...s.groups],
+    meIds: { ...s.meIds, [group.id]: me.id },
+  }));
+  return group.id;
+}
+
 /** Edit a group and tell the cloud about it. */
 export function mutateGroup(id: ID, fn: (g: Group) => void) {
   setState((s) => ({

@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import type { Group, GroupDoc, ID } from './types';
 import {
   getState,
@@ -100,6 +100,7 @@ export function toDoc(g: Group): GroupDoc {
     id: g.id,
     name: g.name,
     emoji: g.emoji,
+    kind: g.kind,
     createdAt: g.createdAt,
     metaUpdatedAt: g.metaUpdatedAt,
     updatedAt: g.updatedAt,
@@ -126,6 +127,7 @@ export function mergeDocs(local: GroupDoc, remote: GroupDoc): GroupDoc {
     id: local.id,
     name: meta.name,
     emoji: meta.emoji,
+    kind: local.kind ?? remote.kind,
     createdAt: Math.min(local.createdAt, remote.createdAt),
     metaUpdatedAt: Math.max(local.metaUpdatedAt, remote.metaUpdatedAt),
     updatedAt: Math.max(local.updatedAt, remote.updatedAt),
@@ -229,6 +231,25 @@ export function startCloud() {
   window.addEventListener('online', () => {
     for (const g of getState().groups) if (g.code) void syncGroup(g.id);
   });
+}
+
+/** Keeps a shared group fresh while its screen is open: on open, every 10 seconds, and when the app returns to the front. */
+export function useAutoSync(groupId: ID, code?: string) {
+  useEffect(() => {
+    if (!code) return;
+    void syncGroup(groupId);
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void syncGroup(groupId);
+    }, 10000);
+    const onVisible = () => {
+      if (!document.hidden) void syncGroup(groupId);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [groupId, code]);
 }
 
 /* ---------------- share and join ---------------- */

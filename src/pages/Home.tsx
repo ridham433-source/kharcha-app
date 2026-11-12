@@ -23,11 +23,18 @@ export default function Home() {
 
   let owed = 0;
   let owe = 0;
+  let kOwed = 0;
+  let kOwe = 0;
   for (const g of s.groups) {
     const b = myBalance(s, g);
-    if (b > 0) owed += b;
+    if (g.kind === 'friend') {
+      if (b > 0) kOwed += b;
+      else kOwe += -b;
+    } else if (b > 0) owed += b;
     else owe += -b;
   }
+  const hasTrips = s.groups.some((g) => g.kind !== 'friend');
+  const hasFriends = s.groups.some((g) => g.kind === 'friend');
 
   const accounts = s.accounts.filter((a) => !a.archived);
   const recent = all.slice(0, 5);
@@ -105,7 +112,7 @@ export default function Home() {
             Open
           </a>
         </div>
-        {s.groups.length > 0 && (
+        {hasTrips && (
           <div className="row" style={{ marginTop: 14, gap: 24 }}>
             <div>
               <div className="small" style={{ fontWeight: 600 }}>You are owed</div>
@@ -114,6 +121,30 @@ export default function Home() {
             <div>
               <div className="small" style={{ fontWeight: 600 }}>You owe</div>
               <div className="num" style={{ fontSize: 22 }}>{fmt(owe)}</div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="card soft">
+        <div className="row between">
+          <div>
+            <h2>Khata</h2>
+            <div className="tagline">Never forget who owes whom</div>
+          </div>
+          <a href="#/khata" className="btn small primary">
+            Open
+          </a>
+        </div>
+        {hasFriends && (
+          <div className="row" style={{ marginTop: 14, gap: 24 }}>
+            <div>
+              <div className="small" style={{ fontWeight: 600 }}>Owed to you</div>
+              <div className="num pos" style={{ fontSize: 22 }}>{fmt(kOwed)}</div>
+            </div>
+            <div>
+              <div className="small" style={{ fontWeight: 600 }}>You owe</div>
+              <div className="num neg" style={{ fontSize: 22 }}>{fmt(kOwe)}</div>
             </div>
           </div>
         )}

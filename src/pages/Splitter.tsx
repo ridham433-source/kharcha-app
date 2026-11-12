@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { createGroup, useAppState } from '../lib/store';
+import { createGroup, getState, useAppState } from '../lib/store';
 import { myBalance } from '../lib/derive';
 import { fmt } from '../lib/money';
 import { GROUP_EMOJIS } from '../lib/categories';
 import { activeMembers } from '../lib/splits';
 import { go } from '../lib/router';
+import { groupPath } from '../lib/util';
 import { cloudConfig, joinByCode } from '../lib/cloud';
 import { Empty, Icon, Sheet } from '../components/ui';
 
@@ -13,9 +14,10 @@ export default function Splitter() {
   const [newOpen, setNewOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
 
+  const trips = s.groups.filter((g) => g.kind !== 'friend');
   let owed = 0;
   let owe = 0;
-  for (const g of s.groups) {
+  for (const g of trips) {
     const b = myBalance(s, g);
     if (b > 0) owed += b;
     else owe += -b;
@@ -30,7 +32,7 @@ export default function Splitter() {
         </div>
       </header>
 
-      {s.groups.length > 0 && (
+      {trips.length > 0 && (
         <section className="card lemon">
           <div className="row" style={{ gap: 28 }}>
             <div>
@@ -45,7 +47,7 @@ export default function Splitter() {
         </section>
       )}
 
-      {s.groups.length === 0 ? (
+      {trips.length === 0 ? (
         <div className="card">
           <Empty
             emoji="🍋"
@@ -60,7 +62,7 @@ export default function Splitter() {
         </div>
       ) : (
         <div className="card flush list">
-          {s.groups.map((g) => {
+          {trips.map((g) => {
             const b = myBalance(s, g);
             const members = activeMembers(g).length;
             return (
@@ -92,11 +94,15 @@ export default function Splitter() {
         </div>
       )}
 
+      <a href="#/khata" className="btn ghost block">
+        🤝 Open Khata (friend balances)
+      </a>
+
       <button className="btn ghost block" onClick={() => setJoinOpen(true)}>
         <Icon name="link" /> Join with a code
       </button>
 
-      {s.groups.length > 0 && (
+      {trips.length > 0 && (
         <button className="btn lemon fab-float" onClick={() => setNewOpen(true)}>
           <Icon name="plus" /> New group
         </button>
@@ -167,7 +173,7 @@ function NewGroupSheet({ open, onClose }: { open: boolean; onClose: () => void }
   );
 }
 
-function JoinSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function JoinSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -179,7 +185,7 @@ function JoinSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     try {
       const id = await joinByCode(code);
       onClose();
-      go(`/splitter/${id}`);
+      go(groupPath(getState().groups.find((x) => x.id === id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not join');
     } finally {

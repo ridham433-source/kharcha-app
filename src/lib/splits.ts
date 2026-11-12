@@ -1,5 +1,6 @@
 import type { Group, GroupExpense, ID } from './types';
 import { fmt } from './money';
+import { shortDate } from './util';
 
 /**
  * Splits `total` paise across members in proportion to their weights.
@@ -142,6 +143,52 @@ export function summaryText(g: Group, link?: string): string {
     }
   } else {
     lines.push('Everyone is settled up ✅');
+  }
+  if (link) lines.push('', link);
+  return lines.join('\n');
+}
+
+/* ---------------- Khata (two-person ledgers) ---------------- */
+
+/** The other person in a two-person ledger. */
+export function otherMember(g: Group, meId?: ID) {
+  const list = activeMembers(g);
+  return list.find((m) => m.id !== meId) ?? list[0];
+}
+
+/** Positive = the friend owes me. Negative = I owe the friend. */
+export function friendBalance(g: Group, meId: ID): number {
+  return netBalances(g)[meId] ?? 0;
+}
+
+/** Text to send on WhatsApp: the current balance and the latest entries. */
+export function friendSummary(g: Group, meId: ID, link?: string): string {
+  const them = otherMember(g, meId)?.name ?? g.name;
+  const me = memberName(g, meId);
+  const bal = friendBalance(g, meId);
+  const lines = [`🤝 Khata · ${me} & ${them}`];
+  if (bal > 0) lines.push(`${them} owes ${me} ${fmt(bal)}`);
+  else if (bal < 0) lines.push(`${me} owes ${them} ${fmt(-bal)}`);
+  else lines.push('All settled up ✅');
+
+  const rows: { date: string; at: number; text: string }[] = [
+    ...activeExpenses(g).map((e) => ({
+      date: e.date,
+      at: e.updatedAt,
+      text: `${e.title}: ${Object.keys(e.paidBy).map((id) => memberName(g, id)).join(' + ')} paid ${fmt(e.amountPaise)}`,
+    })),
+    ...activePayments(g).map((p) => ({
+      date: p.date,
+      at: p.updatedAt,
+      text: `Settled: ${memberName(g, p.from)} paid ${memberName(g, p.to)} ${fmt(p.amountPaise)}`,
+    })),
+  ]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at)
+    .slice(0, 8);
+
+  if (rows.length) {
+    lines.push('', 'Recent:');
+    for (const r of rows) lines.push(`• ${shortDate(r.date)} · ${r.text}`);
   }
   if (link) lines.push('', link);
   return lines.join('\n');

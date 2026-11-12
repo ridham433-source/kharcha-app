@@ -32,6 +32,7 @@ export function entries(s: AppState): Entry[] {
 
   if (s.settings.includeGroupShare) {
     for (const g of s.groups) {
+      if (g.kind === 'friend') continue; // Khata money is not daily spending
       const me = s.meIds[g.id];
       if (!me) continue;
       for (const e of activeExpenses(g)) {

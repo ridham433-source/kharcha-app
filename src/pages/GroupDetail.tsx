@@ -434,10 +434,11 @@ function WhoAmI({ g, open }: { g: Group; open: boolean }) {
   );
 }
 
-function InviteSheet({ g, open, onClose }: { g: Group; open: boolean; onClose: () => void }) {
+export function InviteSheet({ g, open, onClose }: { g: Group; open: boolean; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const isFriend = g.kind === 'friend';
   const configured = cloudConfig() !== null;
 
   const create = async () => {
@@ -465,7 +466,7 @@ function InviteSheet({ g, open, onClose }: { g: Group; open: boolean; onClose: (
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Invite friends">
+    <Sheet open={open} onClose={onClose} title={isFriend ? 'Sync with your friend' : 'Invite friends'}>
       <div className="stack">
         {!g.code ? (
           !configured ? (
@@ -489,7 +490,9 @@ function InviteSheet({ g, open, onClose }: { g: Group; open: boolean; onClose: (
           ) : (
             <>
               <p style={{ margin: 0 }}>
-                Create a link. Anyone with it can join this group and add expenses from their own phone.
+                {isFriend
+                  ? 'Create a link and send it to your friend. When they open it, you both see the same balance and either of you can add entries.'
+                  : 'Create a link. Anyone with it can join this group and add expenses from their own phone.'}
               </p>
               {error && <div className="notice bad">{error}</div>}
               <button className="btn lemon block" disabled={busy} onClick={create}>
@@ -503,7 +506,7 @@ function InviteSheet({ g, open, onClose }: { g: Group; open: boolean; onClose: (
               <div className="muted small">Group code</div>
               <div className="num" style={{ fontSize: 28, letterSpacing: '0.06em' }}>{g.code}</div>
             </div>
-            <button className="btn lemon block" onClick={() => void shareText(`Join "${g.name}" on Splitter:\n${link}`)}>
+            <button className="btn lemon block" onClick={() => void shareText(isFriend ? `Open our Khata so we both see who owes what:\n${link}` : `Join "${g.name}" on Splitter:\n${link}`)}>
               <Icon name="share" /> Share on WhatsApp or other apps
             </button>
             <button className="btn block" onClick={copy}>

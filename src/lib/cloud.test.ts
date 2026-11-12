@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { enableSharing, joinByCode, mergeDocs, syncGroup, toDoc } from './cloud';
 import {
+  createFriend,
   createGroup,
   getState,
   saveGroupExpense,
@@ -183,6 +184,17 @@ describe('cloud sync against a fake server', () => {
     const titles = server.rows.get(code)!.data.expenses.map((e) => e.title).sort();
     expect(titles).toEqual(['Mine', 'sneaky']);
     expect(getState().groups[0].expenses).toHaveLength(2);
+  });
+
+  it('a friend ledger keeps its kind when the friend joins from another phone', async () => {
+    const id = createFriend('Neel');
+    const code = await enableSharing(id);
+    expect(server.rows.get(code)?.data.kind).toBe('friend');
+    leaveGroup(id);
+    await joinByCode(code);
+    const joined = getState().groups[0];
+    expect(joined.kind).toBe('friend');
+    expect(joined.members).toHaveLength(2);
   });
 
   it('toDoc leaves local-only fields out', () => {

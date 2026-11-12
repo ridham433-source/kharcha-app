@@ -24,6 +24,11 @@ export function go(to: string) {
   window.location.hash = to;
 }
 
+/** Go to a screen without leaving the current one in the back history. */
+export function replace(to: string) {
+  window.location.replace(`${window.location.pathname}#${to}`);
+}
+
 /** Go back one screen, or to `fallback` if there is nothing to go back to. */
 export function back(fallback = '/') {
   if (window.history.length > 1) window.history.back();

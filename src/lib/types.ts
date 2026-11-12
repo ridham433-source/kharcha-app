@@ -77,6 +77,8 @@ export interface GroupDoc {
   id: ID;
   name: string;
   emoji: string;
+  /** 'friend' = a two-person Khata ledger. Missing = a normal Splitter trip group. */
+  kind?: 'friend';
   createdAt: number;
   metaUpdatedAt: number;
   updatedAt: number;

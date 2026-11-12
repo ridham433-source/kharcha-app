@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allocate, netBalances, owedShares, settleUp, groupTotals } from './splits';
+import { allocate, netBalances, owedShares, settleUp, groupTotals, friendBalance, friendSummary, otherMember } from './splits';
 import { fmt, parseAmount } from './money';
 import type { Group, GroupExpense } from './types';
 
@@ -150,5 +150,69 @@ describe('group totals', () => {
     expect(t.totalSpent).toBe(300);
     expect(t.paid.a).toBe(300);
     expect(sum(t.share)).toBe(300);
+  });
+});
+
+describe('Khata (two-person ledger)', () => {
+  const ledger = (expenses: GroupExpense[], payments: Group['payments'] = []): Group => ({
+    id: 'k',
+    name: 'Neel',
+    emoji: '🤝',
+    kind: 'friend',
+    createdAt: 1,
+    metaUpdatedAt: 1,
+    updatedAt: 1,
+    members: [member('me'), member('neel')],
+    expenses,
+    payments,
+  });
+
+  // I paid a 1000 bill and split it equally: Neel owes me 500.
+  const iPaidBill = exp({ amountPaise: 100000, paidBy: { me: 100000 }, weights: { me: 1, neel: 1 } });
+  // Neel paid a 800 bill and we split it: I owe him 400.
+  const neelPaidBill = exp({ amountPaise: 80000, paidBy: { neel: 80000 }, weights: { me: 1, neel: 1 } });
+
+  it('+500 then -400 leaves Neel owing 100', () => {
+    const g = ledger([iPaidBill, neelPaidBill]);
+    expect(friendBalance(g, 'me')).toBe(10000);
+    expect(friendBalance(g, 'neel')).toBe(-10000);
+  });
+
+  it('full amount entries: lent 300 to Neel, borrowed 50 from him', () => {
+    const lent = exp({ splitType: 'exact', amountPaise: 30000, paidBy: { me: 30000 }, weights: { neel: 30000 } });
+    const borrowed = exp({ splitType: 'exact', amountPaise: 5000, paidBy: { neel: 5000 }, weights: { me: 5000 } });
+    expect(friendBalance(ledger([lent, borrowed]), 'me')).toBe(25000);
+  });
+
+  it('a settlement reduces the balance, and a part payment leaves the rest', () => {
+    const settled = ledger(
+      [iPaidBill],
+      [{ id: 'p1', from: 'neel', to: 'me', amountPaise: 20000, date: '2026-11-02', updatedAt: 1 }],
+    );
+    expect(friendBalance(settled, 'me')).toBe(30000);
+    const full = ledger(
+      [iPaidBill],
+      [{ id: 'p2', from: 'neel', to: 'me', amountPaise: 50000, date: '2026-11-02', updatedAt: 1 }],
+    );
+    expect(friendBalance(full, 'me')).toBe(0);
+  });
+
+  it('works from both phones: opposite sign, same amount', () => {
+    const g = ledger([iPaidBill]);
+    expect(friendBalance(g, 'me')).toBe(-friendBalance(g, 'neel'));
+  });
+
+  it('odd paise never go missing', () => {
+    const e = exp({ amountPaise: 10001, paidBy: { me: 10001 }, weights: { me: 1, neel: 1 } });
+    const g = ledger([e]);
+    expect(friendBalance(g, 'me') + friendBalance(g, 'neel')).toBe(0);
+  });
+
+  it('finds the other person and writes a shareable summary', () => {
+    const g = ledger([iPaidBill, neelPaidBill]);
+    expect(otherMember(g, 'me')?.id).toBe('neel');
+    const text = friendSummary(g, 'me');
+    expect(text).toContain('NEEL owes ME ₹100');
+    expect(text).toContain('Recent:');
   });
 });

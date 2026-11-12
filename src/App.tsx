@@ -10,6 +10,8 @@ import Splitter from './pages/Splitter';
 import GroupDetail from './pages/GroupDetail';
 import GroupExpenseForm from './pages/GroupExpenseForm';
 import Join from './pages/Join';
+import Khata from './pages/Khata';
+import KhataDetail from './pages/KhataDetail';
 
 export default function App() {
   const hash = useHash();
@@ -36,11 +38,23 @@ export default function App() {
     page = <More />;
     nav = 'more';
   } else if (a === 'add') {
-    page = <AddTx />;
+    page = <AddTx startOwe={query.has('owe')} friendId={query.get('owe') ?? undefined} key={query.toString()} />;
   } else if (a === 'edit' && b) {
     page = <AddTx editId={b} key={b} />;
   } else if (a === 'join' && b) {
-    page = <Join code={b} url={query.get('u') ?? undefined} key={b} />;
+    page = (
+      <Join
+        code={b}
+        url={query.get('u') ?? undefined}
+        anonKey={query.get('k') ?? undefined}
+        key={b}
+      />
+    );
+  } else if (a === 'khata' && !b) {
+    page = <Khata />;
+    nav = 'khata';
+  } else if (a === 'khata' && b) {
+    page = <KhataDetail id={b} key={b} />;
   } else if (a === 'splitter' && !b) {
     page = <Splitter />;
     nav = 'splitter';

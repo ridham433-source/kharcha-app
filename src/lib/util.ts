@@ -1,3 +1,22 @@
+import type { Group } from './types';
+
+/** Where a group lives in the app: trips in Splitter, friend ledgers in Khata. */
+export const groupPath = (g?: Pick<Group, 'id' | 'kind'>): string =>
+  !g ? '/splitter' : g.kind === 'friend' ? `/khata/${g.id}` : `/splitter/${g.id}`;
+
+/** Opens the phone's share sheet, or WhatsApp when there is none. */
+export async function shareText(text: string) {
+  if (typeof navigator !== 'undefined' && 'share' in navigator) {
+    try {
+      await navigator.share({ text });
+    } catch {
+      /* cancelled */
+    }
+    return;
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+}
+
 export const uid = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
