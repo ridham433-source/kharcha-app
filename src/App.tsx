@@ -12,6 +12,10 @@ import GroupExpenseForm from './pages/GroupExpenseForm';
 import Join from './pages/Join';
 import Khata from './pages/Khata';
 import KhataDetail from './pages/KhataDetail';
+import RecurringPage from './pages/Recurring';
+import Report from './pages/Report';
+import { processRecurring } from './lib/store';
+import { today } from './lib/util';
 
 export default function App() {
   const hash = useHash();
@@ -21,6 +25,14 @@ export default function App() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [hash]);
+
+  // Add repeating expenses that came due, now and whenever the app is opened again.
+  useEffect(() => {
+    processRecurring(today());
+    const onShow = () => document.visibilityState === 'visible' && processRecurring(today());
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, []);
 
   let page: JSX.Element;
   let nav: string | null = null; // which tab is highlighted; null hides the nav
@@ -50,6 +62,10 @@ export default function App() {
         key={b}
       />
     );
+  } else if (a === 'repeat') {
+    page = <RecurringPage />;
+  } else if (a === 'report') {
+    page = <Report month={query.get('m') ?? undefined} />;
   } else if (a === 'khata' && !b) {
     page = <Khata />;
     nav = 'khata';

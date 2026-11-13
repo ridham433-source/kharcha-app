@@ -15,6 +15,7 @@ import { EXPENSE_CATS } from '../lib/categories';
 import { fmt, parseAmount, toInput } from '../lib/money';
 import { accountBalance } from '../lib/derive';
 import { download, today, uid } from '../lib/util';
+import { looksLikeUpi, reminderIcs } from '../lib/report';
 import { cloudConfig, testCloud } from '../lib/cloud';
 import { Icon, TopBar } from '../components/ui';
 import type { Account, AppState, Goal } from '../lib/types';
@@ -49,8 +50,27 @@ export default function More() {
             onChange={(e) => updateSettings({ userName: e.target.value })}
           />
         </label>
+        <label className="field">
+          <span>Your UPI ID (for payment reminders)</span>
+          <input
+            className="input"
+            placeholder="name@okhdfcbank"
+            autoCapitalize="none"
+            value={s.settings.upiId}
+            onChange={(e) => updateSettings({ upiId: e.target.value.trim() })}
+          />
+          {s.settings.upiId && !looksLikeUpi(s.settings.upiId) && (
+            <span className="muted small">This does not look like a UPI ID. It should look like name@bank.</span>
+          )}
+        </label>
       </Section>
 
+      <Section title="Automatic and reports">
+        <a href="#/repeat" className="btn block">🔁 Repeating expenses (subscriptions, SIP, rent)</a>
+        <a href="#/report" className="btn block">📋 Monthly report card</a>
+      </Section>
+
+      <ReminderSection />
       <BudgetSection />
       <AccountSection />
       <GoalSection />
@@ -425,6 +445,44 @@ function DataSection() {
       >
         Delete all data
       </button>
+    </Section>
+  );
+}
+
+/* ---------------- daily reminder ---------------- */
+
+function ReminderSection() {
+  const s = useAppState();
+  return (
+    <Section title="Daily reminder" note="A prompt on the home screen after this time if you have not added anything today.">
+      <label className="row" style={{ cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          style={{ width: 26, height: 26 }}
+          checked={s.settings.reminderOn}
+          onChange={(e) => updateSettings({ reminderOn: e.target.checked })}
+        />
+        <b className="grow">Remind me to add today's expenses</b>
+      </label>
+      <label className="field">
+        <span>Time</span>
+        <input
+          className="input"
+          type="time"
+          value={s.settings.reminderTime}
+          onChange={(e) => e.target.value && updateSettings({ reminderTime: e.target.value })}
+        />
+      </label>
+      <button
+        className="btn block"
+        onClick={() => download('kharcha-daily-reminder.ics', reminderIcs(s.settings.reminderTime), 'text/calendar')}
+      >
+        Also remind me on my phone
+      </button>
+      <p className="muted small" style={{ margin: 0 }}>
+        The home prompt only shows when you open the app. The button above adds a daily alarm to your phone's
+        calendar so you get a real notification. If it does not open, set a repeating alarm in your Clock app.
+      </p>
     </Section>
   );
 }

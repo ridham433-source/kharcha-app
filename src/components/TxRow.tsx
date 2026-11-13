@@ -22,6 +22,7 @@ export default function TxRow({ e }: { e: Entry }) {
           {e.note ? `${e.category}` : ''}
           {account ? `${e.note ? ' · ' : ''}${account}` : ''}
           {e.necessary === false && <span className="badge red" style={{ marginLeft: 6 }}>Could skip</span>}
+          {e.recurring && <span className="badge green" style={{ marginLeft: 6 }}>Auto</span>}
           {e.internal && <span className="badge blue" style={{ marginLeft: 6 }}>Khata</span>}
           {!!e.sharedPaise && (
             <span className="badge blue" style={{ marginLeft: 6 }}>{fmt(e.sharedPaise)} owed to you</span>

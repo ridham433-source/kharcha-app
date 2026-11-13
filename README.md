@@ -105,3 +105,10 @@ supabase/schema.sql
 ## Khata (who owes whom)
 
 Khata keeps a running ledger with each friend. Add an expense and turn on **Split with a friend** to record, in one go, what you paid and how much of it your friend owes you. Only your own part counts as your spending. When money comes back, tap **Settle up** on the friend's page and pick the account: the payment and the account entry are saved together. Both phones stay in sync when sync is set up (see Supabase section).
+
+## Repeating expenses, report card, UPI and reminder
+
+- **Repeating expenses** (More > Repeating expenses): subscriptions, SIPs, rent. They are added by themselves on the due date, the next time the app is opened, including missed days.
+- **Report card** (More > Monthly report card): compares with last month, shows top category, no-spend days and a tip, and can be shared.
+- **UPI** in Khata > Settle up: opens your UPI app with the amount filled in. Add your own UPI ID in More so payment reminders include it.
+- **Daily reminder**: a prompt on the home screen after the chosen time, plus a daily phone-calendar alarm.

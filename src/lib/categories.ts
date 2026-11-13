@@ -9,6 +9,7 @@ export const EXPENSE_CATS: Cat[] = [
   { id: 'Transport', emoji: '🚌' },
   { id: 'Shopping', emoji: '🛍️' },
   { id: 'Bills', emoji: '💡' },
+  { id: 'Subscriptions', emoji: '📺' },
   { id: 'Rent', emoji: '🏠' },
   { id: 'Health', emoji: '💊' },
   { id: 'Fun', emoji: '🎬' },

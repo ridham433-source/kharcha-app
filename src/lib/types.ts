@@ -26,6 +26,27 @@ export interface Tx {
   internal?: boolean;
   /** The Khata entry that was created together with this transaction. */
   khata?: { groupId: ID; expenseId?: ID; paymentId?: ID };
+  /** Set when this was added automatically by a repeating expense. */
+  recurringId?: ID;
+}
+
+export type Repeat = 'weekly' | 'monthly' | 'yearly';
+
+/** An expense or income that repeats and is added by itself on its dates. */
+export interface Recurring {
+  id: ID;
+  type: TxType;
+  amountPaise: number;
+  category: string;
+  accountId: ID | null;
+  note: string;
+  necessary: boolean;
+  repeat: Repeat;
+  /** First date it happens (YYYY-MM-DD). The day of month or weekday comes from this. */
+  startDate: string;
+  /** Everything up to and including this date has already been added. */
+  lastDate?: string;
+  paused?: boolean;
 }
 
 export interface Goal {
@@ -105,6 +126,13 @@ export interface Settings {
   includeGroupShare: boolean;
   cloudUrl: string;
   cloudKey: string;
+  /** My own UPI ID, shared in payment reminders. */
+  upiId: string;
+  reminderOn: boolean;
+  /** HH:MM, local time */
+  reminderTime: string;
+  /** Day for which the person said "nothing spent today" or dismissed the reminder. */
+  reminderDoneDate: string;
 }
 
 export interface AppState {
@@ -114,6 +142,7 @@ export interface AppState {
   /** category -> monthly limit in paise. "_total" is the overall monthly budget. */
   budgets: Record<string, number>;
   goals: Goal[];
+  recurring: Recurring[];
   groups: Group[];
   /** groupId -> memberId that is "me" on this device */
   meIds: Record<ID, ID>;

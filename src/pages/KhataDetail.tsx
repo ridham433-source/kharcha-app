@@ -8,6 +8,7 @@ import {
   saveTx,
   setMe,
   unlinkKhataExpense,
+  updateMember,
   useAppState,
 } from '../lib/store';
 import {
@@ -26,7 +27,8 @@ import { go } from '../lib/router';
 import { inviteLink, useAutoSync, useSyncStatus } from '../lib/cloud';
 import { Avatar, Empty, Icon, Sheet, TopBar } from '../components/ui';
 import { InviteSheet } from './GroupDetail';
-import type { Group } from '../lib/types';
+import { looksLikeUpi, upiLink } from '../lib/report';
+import type { Group, Member } from '../lib/types';
 
 export default function KhataDetail({ id }: { id: string }) {
   const s = useAppState();
@@ -111,6 +113,21 @@ export default function KhataDetail({ id }: { id: string }) {
         <Icon name="share" /> Share balance on WhatsApp
       </button>
 
+      {net > 0 && (
+        <button
+          className="btn block"
+          onClick={() =>
+            void shareText(
+              `Hi ${theirName}, a small reminder: you owe me ${fmt(net)}.` +
+                (s.settings.upiId ? `\nYou can pay by UPI to: ${s.settings.upiId}` : '') +
+                '\nThanks!',
+            )
+          }
+        >
+          💬 Send a payment reminder
+        </button>
+      )}
+
       <History g={g} meId={meId} theirName={theirName} />
 
       <button
@@ -126,7 +143,7 @@ export default function KhataDetail({ id }: { id: string }) {
       </button>
 
       {settleOpen && meId && other && (
-        <SettleSheet g={g} meId={meId} otherId={other.id} net={net} theirName={theirName} onClose={() => setSettleOpen(false)} />
+        <SettleSheet g={g} meId={meId} other={other} net={net} theirName={theirName} onClose={() => setSettleOpen(false)} />
       )}
       <InviteSheet g={g} open={inviteOpen} onClose={() => setInviteOpen(false)} />
       <Sheet open={!meId} onClose={() => {}} title="Which one are you?">
@@ -244,14 +261,14 @@ function History({ g, meId, theirName }: { g: Group; meId?: string; theirName: s
 function SettleSheet({
   g,
   meId,
-  otherId,
+  other,
   net,
   theirName,
   onClose,
 }: {
   g: Group;
   meId: string;
-  otherId: string;
+  other: Member;
   net: number;
   theirName: string;
   onClose: () => void;
@@ -262,7 +279,9 @@ function SettleSheet({
   const [amt, setAmt] = useState(toInput(Math.abs(net)));
   const paise = parseAmount(amt) ?? 0;
   const max = Math.abs(net);
+  const otherId = other.id;
   const iPay = net < 0;
+  const [upiInput, setUpiInput] = useState('');
   const problem = paise <= 0 ? 'Enter an amount.' : paise > max ? `The balance is only ${fmt(max)}.` : '';
 
   const record = () => {
@@ -319,6 +338,43 @@ function SettleSheet({
             <option value="">Do not record in an account</option>
           </select>
         </label>
+        {iPay && !problem && (
+          other.upi ? (
+            <button
+              className="btn block"
+              onClick={() => {
+                window.location.href = upiLink({ upi: other.upi!, name: theirName, paise, note: 'Kharcha settle up' });
+              }}
+            >
+              Pay {fmt(paise)} with UPI
+            </button>
+          ) : (
+            <div className="stack" style={{ gap: 8 }}>
+              <label className="field">
+                <span>{theirName}'s UPI ID (to pay from here)</span>
+                <input
+                  className="input"
+                  placeholder="name@bank"
+                  autoCapitalize="none"
+                  value={upiInput}
+                  onChange={(e) => setUpiInput(e.target.value.trim())}
+                />
+              </label>
+              <button
+                className="btn"
+                disabled={!looksLikeUpi(upiInput)}
+                onClick={() => updateMember(g.id, other.id, { upi: upiInput })}
+              >
+                Save UPI ID
+              </button>
+            </div>
+          )
+        )}
+        {iPay && other.upi && (
+          <p className="muted small" style={{ margin: 0 }}>
+            Your UPI app opens with the amount filled in. After you pay, come back and tap Record payment.
+          </p>
+        )}
         <p className="muted small" style={{ margin: 0 }}>
           Part of the amount is fine. The rest stays on the balance.
         </p>

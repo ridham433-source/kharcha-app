@@ -9,9 +9,10 @@ const state = (txs: Tx[]): AppState => ({
   txs,
   budgets: {},
   goals: [],
+  recurring: [],
   groups: [],
   meIds: {},
-  settings: { userName: 'R', includeGroupShare: true, cloudUrl: '', cloudKey: '' },
+  settings: { userName: 'R', includeGroupShare: true, cloudUrl: '', cloudKey: '', upiId: '', reminderOn: true, reminderTime: '21:00', reminderDoneDate: '' },
 });
 
 let n = 0;

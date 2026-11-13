@@ -8,8 +8,10 @@ import type {
   ID,
   Member,
   Payment,
+  Recurring,
   Tx,
 } from './types';
+import { occurrences } from './recurring';
 import { uid } from './util';
 
 const KEY = 'kharcha:v1';
@@ -24,9 +26,19 @@ function initial(): AppState {
     txs: [],
     budgets: {},
     goals: [],
+    recurring: [],
     groups: [],
     meIds: {},
-    settings: { userName: 'Me', includeGroupShare: true, cloudUrl: '', cloudKey: '' },
+    settings: {
+      userName: 'Me',
+      includeGroupShare: true,
+      cloudUrl: '',
+      cloudKey: '',
+      upiId: '',
+      reminderOn: true,
+      reminderTime: '21:00',
+      reminderDoneDate: '',
+    },
   };
 }
 
@@ -333,4 +345,57 @@ export function replaceGroupSilently(g: Group) {
       ? s.groups.map((x) => (x.id === g.id ? g : x))
       : [g, ...s.groups],
   }));
+}
+
+/* ---------------- repeating expenses ---------------- */
+
+export function saveRecurring(r: Omit<Recurring, 'id'> & { id?: ID }): ID {
+  const id = r.id ?? uid();
+  setState((s) => {
+    const existing = s.recurring.find((x) => x.id === id);
+    const rule: Recurring = { ...r, id };
+    return {
+      ...s,
+      recurring: existing ? s.recurring.map((x) => (x.id === id ? rule : x)) : [...s.recurring, rule],
+    };
+  });
+  return id;
+}
+
+export function deleteRecurring(id: ID) {
+  setState((s) => ({ ...s, recurring: s.recurring.filter((r) => r.id !== id) }));
+}
+
+/**
+ * Adds every repeating entry that has come due, including days missed while the app was closed.
+ * Safe to call as often as you like: each date is added only once. Returns how many were added.
+ */
+export function processRecurring(todayStr: string): number {
+  let added = 0;
+  setState((s) => {
+    if (!s.recurring.length) return s;
+    const newTxs: Tx[] = [];
+    const recurring = s.recurring.map((r) => {
+      if (r.paused) return r;
+      const dates = occurrences(r, todayStr);
+      for (const date of dates) {
+        newTxs.push({
+          id: uid(),
+          type: r.type,
+          amountPaise: r.amountPaise,
+          category: r.category,
+          accountId: r.accountId,
+          date,
+          note: r.note,
+          necessary: r.necessary,
+          createdAt: Date.now(),
+          recurringId: r.id,
+        });
+      }
+      return dates.length ? { ...r, lastDate: todayStr } : r;
+    });
+    added = newTxs.length;
+    return added ? { ...s, recurring, txs: [...s.txs, ...newTxs] } : s;
+  });
+  return added;
 }

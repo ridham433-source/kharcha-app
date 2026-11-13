@@ -21,6 +21,8 @@ export interface Entry {
   sharedPaise?: number;
   /** A Khata settlement: moves money in an account but is not income or spending. */
   internal?: boolean;
+  /** Added automatically by a repeating expense. */
+  recurring?: boolean;
 }
 
 export function entries(s: AppState): Entry[] {
@@ -41,6 +43,7 @@ export function entries(s: AppState): Entry[] {
         : t.amountPaise,
     sharedPaise: t.sharedPaise,
     internal: t.internal,
+    recurring: Boolean(t.recurringId),
   }));
 
   if (s.settings.includeGroupShare) {

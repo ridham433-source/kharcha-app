@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
-import { useAppState } from '../lib/store';
+import { updateSettings, useAppState } from '../lib/store';
+import { nextDate } from '../lib/recurring';
+import { reminderDue } from '../lib/report';
 import { accountBalance, entries, monthStats, myBalance } from '../lib/derive';
 import { fmt } from '../lib/money';
-import { monthKey, monthLabel, today } from '../lib/util';
+import { monthKey, monthLabel, shiftMonth, shortDate, today } from '../lib/util';
 import { Icon } from '../components/ui';
 import TxRow from '../components/TxRow';
 import { go } from '../lib/router';
@@ -36,6 +38,27 @@ export default function Home() {
   const hasTrips = s.groups.some((g) => g.kind !== 'friend');
   const hasFriends = s.groups.some((g) => g.kind === 'friend');
 
+  const t = today();
+  const now = new Date();
+  const showReminder = reminderDue({
+    on: s.settings.reminderOn,
+    time: s.settings.reminderTime,
+    doneDate: s.settings.reminderDoneDate,
+    hasEntryToday: s.txs.some((x) => x.date === t && !x.recurringId && !x.internal),
+    nowMinutes: now.getHours() * 60 + now.getMinutes(),
+    todayStr: t,
+  });
+  const weekEnd = new Date();
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekEndStr = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}-${String(weekEnd.getDate()).padStart(2, '0')}`;
+  const upcoming = s.recurring
+    .filter((r) => !r.paused)
+    .map((r) => ({ r, date: nextDate(r, t) }))
+    .filter((x) => x.date <= weekEndStr && x.date > t)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const lastMonth = shiftMonth(key, -1);
+  const showReport = Number(t.slice(8, 10)) <= 7 && all.some((e) => monthKey(e.date) === lastMonth);
+
   const accounts = s.accounts.filter((a) => !a.archived);
   const recent = all.slice(0, 5);
 
@@ -52,6 +75,25 @@ export default function Home() {
           <Icon name="user" />
         </a>
       </div>
+
+      {showReminder && (
+        <section className="card lemon">
+          <b>Did you spend anything today?</b>
+          <div className="grid2" style={{ marginTop: 10 }}>
+            <a href="#/add" className="btn primary">Add expense</a>
+            <button className="btn" onClick={() => updateSettings({ reminderDoneDate: t })}>
+              Nothing today
+            </button>
+          </div>
+        </section>
+      )}
+
+      {showReport && (
+        <a href={`#/report?m=${lastMonth}`} className="card soft" style={{ display: 'block' }}>
+          <b>Your {monthLabel(lastMonth).split(' ')[0]} report card is ready</b>
+          <div className="muted small">See how last month went</div>
+        </a>
+      )}
 
       <section className="card blue">
         <div style={{ opacity: 0.9, fontWeight: 600 }}>Spent in {monthLabel(key)}</div>
@@ -101,6 +143,21 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {upcoming.length > 0 && (
+        <section className="card flush list">
+          {upcoming.map(({ r, date }) => (
+            <a key={r.id} href="#/repeat" className="item">
+              <span className="bubble">🔁</span>
+              <span className="grow">
+                <b className="ellipsis" style={{ display: 'block' }}>{r.note || r.category}</b>
+                <span className="muted small">Coming up {shortDate(date)}</span>
+              </span>
+              <span className="num">{fmt(r.amountPaise)}</span>
+            </a>
+          ))}
+        </section>
+      )}
 
       <section className="card lemon">
         <div className="row between">
