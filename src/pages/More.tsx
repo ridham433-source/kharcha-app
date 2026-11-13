@@ -360,7 +360,7 @@ function DataSection() {
 
   const exportCsv = () => {
     const st = getState();
-    const rows = [['Date', 'Type', 'Category', 'Account', 'Note', 'Amount', 'Needed']];
+    const rows = [['Date', 'Type', 'Category', 'Account', 'Note', 'Amount', 'Needed', 'Owed by friend', 'Khata settlement']];
     for (const t of [...st.txs].sort((a, b) => a.date.localeCompare(b.date))) {
       rows.push([
         t.date,
@@ -370,6 +370,8 @@ function DataSection() {
         t.note,
         (t.amountPaise / 100).toFixed(2),
         t.type === 'expense' ? (t.necessary ? 'yes' : 'no') : '',
+        t.sharedPaise ? (t.sharedPaise / 100).toFixed(2) : '',
+        t.internal ? 'yes' : '',
       ]);
     }
     download(`kharcha-transactions-${today()}.csv`, rows.map((r) => r.map(csvCell).join(',')).join('\n'), 'text/csv');

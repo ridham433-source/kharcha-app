@@ -15,7 +15,7 @@ export default function Home() {
 
   const todaySpent = all
     .filter((e) => e.date === today() && e.type === 'expense')
-    .reduce((sum, e) => sum + e.amountPaise, 0);
+    .reduce((sum, e) => sum + e.counted, 0);
 
   const total = s.budgets._total ?? 0;
   const left = total - st.spent;

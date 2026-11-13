@@ -292,6 +292,26 @@ export function deletePayment(groupId: ID, id: ID) {
   });
 }
 
+/** A Khata entry was deleted: keep my own expense, just stop marking part of it as owed. */
+export function unlinkKhataExpense(groupId: ID, expenseId: ID) {
+  setState((s) => ({
+    ...s,
+    txs: s.txs.map((t) =>
+      t.khata?.groupId === groupId && t.khata.expenseId === expenseId
+        ? { ...t, sharedPaise: undefined, khata: undefined }
+        : t,
+    ),
+  }));
+}
+
+/** A Khata settlement was deleted: remove the matching money movement in my account. */
+export function removeKhataPaymentTxs(groupId: ID, paymentId: ID) {
+  setState((s) => ({
+    ...s,
+    txs: s.txs.filter((t) => !(t.khata?.groupId === groupId && t.khata.paymentId === paymentId)),
+  }));
+}
+
 export function setMe(groupId: ID, memberId: ID) {
   setState((s) => ({ ...s, meIds: { ...s.meIds, [groupId]: memberId } }));
 }

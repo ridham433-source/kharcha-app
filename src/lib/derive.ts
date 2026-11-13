@@ -15,6 +15,12 @@ export interface Entry {
   necessary: boolean | null;
   at: number;
   groupId?: string;
+  /** What counts as my spending or income: less than the amount when a friend owes part of it, 0 for Khata settlements. */
+  counted: number;
+  /** Part of this expense that a friend owes back. */
+  sharedPaise?: number;
+  /** A Khata settlement: moves money in an account but is not income or spending. */
+  internal?: boolean;
 }
 
 export function entries(s: AppState): Entry[] {
@@ -28,6 +34,13 @@ export function entries(s: AppState): Entry[] {
     note: t.note,
     necessary: t.type === 'expense' ? t.necessary : null,
     at: t.createdAt,
+    counted: t.internal
+      ? 0
+      : t.type === 'expense'
+        ? Math.max(0, t.amountPaise - (t.sharedPaise ?? 0))
+        : t.amountPaise,
+    sharedPaise: t.sharedPaise,
+    internal: t.internal,
   }));
 
   if (s.settings.includeGroupShare) {
@@ -49,6 +62,7 @@ export function entries(s: AppState): Entry[] {
             necessary: null,
             at: e.updatedAt,
             groupId: g.id,
+            counted: mine,
           });
         }
       }
@@ -95,20 +109,22 @@ export function monthStats(all: Entry[], key: string): MonthStats {
   const expenses: Entry[] = [];
   for (const e of all) {
     if (monthKey(e.date) !== key) continue;
+    if (e.internal) continue; // Khata settlements only move money between people and accounts
     stats.count++;
     if (e.type === 'income') {
-      stats.income += e.amountPaise;
+      stats.income += e.counted;
       continue;
     }
-    stats.spent += e.amountPaise;
+    if (e.counted <= 0) continue; // a friend owes all of it
+    stats.spent += e.counted;
     expenses.push(e);
-    stats.byCategory[e.category] = (stats.byCategory[e.category] ?? 0) + e.amountPaise;
-    if (e.necessary === true) stats.necessary += e.amountPaise;
-    if (e.necessary === false) stats.unnecessary += e.amountPaise;
+    stats.byCategory[e.category] = (stats.byCategory[e.category] ?? 0) + e.counted;
+    if (e.necessary === true) stats.necessary += e.counted;
+    if (e.necessary === false) stats.unnecessary += e.counted;
     const day = Number(e.date.slice(8, 10));
-    if (day >= 1 && day <= days) stats.daily[day - 1] += e.amountPaise;
+    if (day >= 1 && day <= days) stats.daily[day - 1] += e.counted;
   }
-  stats.biggest = expenses.sort((a, b) => b.amountPaise - a.amountPaise).slice(0, 5);
+  stats.biggest = expenses.sort((a, b) => b.counted - a.counted).slice(0, 5);
   return stats;
 }
 

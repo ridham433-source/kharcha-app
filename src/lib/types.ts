@@ -20,6 +20,12 @@ export interface Tx {
   note: string;
   necessary: boolean; // only meaningful for expenses
   createdAt: number;
+  /** Part of this expense that a friend owes back (Khata). Only the rest counts as my spending. */
+  sharedPaise?: number;
+  /** A Khata settlement: moves money in an account but is not income or spending. */
+  internal?: boolean;
+  /** The Khata entry that was created together with this transaction. */
+  khata?: { groupId: ID; expenseId?: ID; paymentId?: ID };
 }
 
 export interface Goal {

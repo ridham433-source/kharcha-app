@@ -101,3 +101,7 @@ supabase/schema.sql
 
 - Data lives in your browser. Use **Profile → Download backup** now and then. Clearing site data erases it.
 - Fonts (Bricolage Grotesque and Figtree) load from Google Fonts. Offline, the app falls back to system fonts.
+
+## Khata (who owes whom)
+
+Khata keeps a running ledger with each friend. Add an expense and turn on **Split with a friend** to record, in one go, what you paid and how much of it your friend owes you. Only your own part counts as your spending. When money comes back, tap **Settle up** on the friend's page and pick the account: the payment and the account entry are saved together. Both phones stay in sync when sync is set up (see Supabase section).

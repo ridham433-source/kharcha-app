@@ -3,8 +3,11 @@ import {
   deleteGroupExpense,
   deletePayment,
   leaveGroup,
+  removeKhataPaymentTxs,
   savePayment,
+  saveTx,
   setMe,
+  unlinkKhataExpense,
   useAppState,
 } from '../lib/store';
 import {
@@ -180,7 +183,12 @@ function History({ g, meId, theirName }: { g: Group; meId?: string; theirName: s
                   <button
                     key={it.id}
                     className="item"
-                    onClick={() => window.confirm('Delete this settlement?') && deletePayment(g.id, p.id)}
+                    onClick={() => {
+                      if (window.confirm('Delete this settlement? If you recorded it in an account, that entry is removed too.')) {
+                        deletePayment(g.id, p.id);
+                        removeKhataPaymentTxs(g.id, p.id);
+                      }
+                    }}
                   >
                     <span className="bubble lemon">💸</span>
                     <span className="grow">
@@ -201,7 +209,12 @@ function History({ g, meId, theirName }: { g: Group; meId?: string; theirName: s
                 <button
                   key={it.id}
                   className="item"
-                  onClick={() => window.confirm('Delete this entry?') && deleteGroupExpense(g.id, e.id)}
+                  onClick={() => {
+                    if (window.confirm('Delete this entry?')) {
+                      deleteGroupExpense(g.id, e.id);
+                      unlinkKhataExpense(g.id, e.id);
+                    }
+                  }}
                 >
                   <span className="bubble">{mine >= 0 ? '↗️' : '↙️'}</span>
                   <span className="grow">
@@ -243,6 +256,9 @@ function SettleSheet({
   theirName: string;
   onClose: () => void;
 }) {
+  const s = useAppState();
+  const accounts = s.accounts.filter((a) => !a.archived);
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
   const [amt, setAmt] = useState(toInput(Math.abs(net)));
   const paise = parseAmount(amt) ?? 0;
   const max = Math.abs(net);
@@ -251,12 +267,26 @@ function SettleSheet({
 
   const record = () => {
     if (problem) return;
-    savePayment(g.id, {
+    const paymentId = savePayment(g.id, {
       from: iPay ? meId : otherId,
       to: iPay ? otherId : meId,
       amountPaise: paise,
       date: today(),
     });
+    // One tap: also move the money in the chosen account, without counting it as income or spending.
+    if (accountId) {
+      saveTx({
+        type: iPay ? 'expense' : 'income',
+        amountPaise: paise,
+        category: 'Khata',
+        accountId,
+        date: today(),
+        note: iPay ? `Paid ${theirName}` : `${theirName} paid back`,
+        necessary: true,
+        internal: true,
+        khata: { groupId: g.id, paymentId },
+      });
+    }
     onClose();
   };
 
@@ -277,6 +307,17 @@ function SettleSheet({
               if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) setAmt(v);
             }}
           />
+        </label>
+        <label className="field">
+          <span>{iPay ? 'Paid from which account?' : 'Money received in which account?'}</span>
+          <select className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+            <option value="">Do not record in an account</option>
+          </select>
         </label>
         <p className="muted small" style={{ margin: 0 }}>
           Part of the amount is fine. The rest stays on the balance.

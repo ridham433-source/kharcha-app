@@ -25,6 +25,6 @@ export const INCOME_CATS: Cat[] = [
 ];
 
 export const catEmoji = (id: string): string =>
-  [...EXPENSE_CATS, ...INCOME_CATS].find((c) => c.id === id)?.emoji ?? '🧾';
+  id === 'Khata' ? '🤝' : ([...EXPENSE_CATS, ...INCOME_CATS].find((c) => c.id === id)?.emoji ?? '🧾');
 
 export const GROUP_EMOJIS = ['🏖️', '🏔️', '🍕', '🏠', '🎉', '🚗', '✈️', '🍻', '🎬', '🏕️'];

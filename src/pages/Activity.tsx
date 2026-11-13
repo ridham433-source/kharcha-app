@@ -21,8 +21,8 @@ export default function Activity() {
     const needle = q.trim().toLowerCase();
     return all.filter((e) => {
       if (monthKey(e.date) !== key) return false;
-      if (filter === 'expense' && e.type !== 'expense') return false;
-      if (filter === 'income' && e.type !== 'income') return false;
+      if (filter === 'expense' && (e.type !== 'expense' || e.internal)) return false;
+      if (filter === 'income' && (e.type !== 'income' || e.internal)) return false;
       if (filter === 'skip' && e.necessary !== false) return false;
       if (needle && !`${e.note} ${e.category}`.toLowerCase().includes(needle)) return false;
       return true;

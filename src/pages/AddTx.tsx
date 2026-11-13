@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
   createFriend,
+  deleteGroupExpense,
+  deletePayment,
   deleteTx,
   getState,
   saveGroupExpense,
@@ -9,11 +11,11 @@ import {
 } from '../lib/store';
 import { EXPENSE_CATS, INCOME_CATS } from '../lib/categories';
 import { fmt, parseAmount, toInput } from '../lib/money';
-import { allocate, otherMember } from '../lib/splits';
+import { allocate, otherMember, splitWithFriend } from '../lib/splits';
 import { back, replace } from '../lib/router';
 import { today } from '../lib/util';
 import { Icon, Segmented, TopBar } from '../components/ui';
-import type { SplitType, TxType } from '../lib/types';
+import type { Group, SplitType, TxType } from '../lib/types';
 
 type Mode = TxType | 'owe';
 
@@ -84,11 +86,22 @@ export default function AddTx({
 
   // Owe (Khata) fields. friend: a ledger id, 'new' for a new friend, '' for nothing chosen yet.
   const [friend, setFriend] = useState<string>(
-    friendId && ledgers.some((l) => l.id === friendId) ? friendId : ledgers.length === 0 ? 'new' : '',
+    friendId && ledgers.some((l) => l.id === friendId)
+      ? friendId
+      : ledgers.length === 0
+        ? 'new'
+        : ledgers.length === 1
+          ? ledgers[0].id
+          : '',
   );
   const [newName, setNewName] = useState('');
   const [iPaid, setIPaid] = useState(true);
   const [equal, setEqual] = useState(true);
+
+  // "Split with a friend" on a normal expense
+  const [splitOn, setSplitOn] = useState(false);
+  const [splitHow, setSplitHow] = useState<'half' | 'full' | 'custom'>('half');
+  const [customAmt, setCustomAmt] = useState('');
 
   if (editId && !editing) {
     return (
@@ -101,6 +114,15 @@ export default function AddTx({
 
   const paise = parseAmount(amount);
   const cats = type === 'expense' ? EXPENSE_CATS : INCOME_CATS;
+  const locked = Boolean(editing?.khata); // linked to a Khata entry, so the amount stays fixed
+  const splitting = mode === 'expense' && splitOn && !editing;
+  const friendShare = !paise
+    ? 0
+    : splitHow === 'full'
+      ? paise
+      : splitHow === 'custom'
+        ? (parseAmount(customAmt) ?? 0)
+        : Math.floor(paise / 2);
 
   const ledger = ledgers.find((l) => l.id === friend);
   const friendName = ledger
@@ -113,8 +135,19 @@ export default function AddTx({
     if (m === 'income') setCategory('Salary');
   };
 
+  const needsFriend = mode === 'owe' || splitting;
   const canSave =
-    !!paise && paise > 0 && (mode !== 'owe' || (friend !== '' && (friend !== 'new' || newName.trim() !== '')));
+    !!paise &&
+    paise > 0 &&
+    (!needsFriend || (friend !== '' && (friend !== 'new' || newName.trim() !== ''))) &&
+    (!splitting || (friendShare > 0 && friendShare <= paise));
+
+  const splitPreview =
+    splitting && paise && friendShare > 0 && friendShare <= paise
+      ? `${friendName} will owe you ${fmt(friendShare)}. Your own spending: ${fmt(paise - friendShare)}.`
+      : '';
+  const splitProblem =
+    splitting && paise && friendShare > paise ? `That is more than the ${fmt(paise)} you paid.` : '';
 
   // What the entry will do, shown before saving.
   const preview = (() => {
@@ -151,9 +184,37 @@ export default function AddTx({
     replace(`/khata/${gid}`);
   };
 
+  /** Records the friend's part in Khata. Returns the link to store on the transaction. */
+  const saveSplit = () => {
+    let gid = friend;
+    if (friend === 'new') {
+      if (!newName.trim()) return undefined;
+      gid = createFriend(newName);
+    }
+    const st = getState();
+    const g = st.groups.find((x) => x.id === gid);
+    const meId = st.meIds[gid];
+    const them = g ? otherMember(g, meId) : undefined;
+    if (!g || !meId || !them) return undefined;
+    const parts = splitWithFriend(paise!, friendShare, meId, them.id);
+    const expenseId = saveGroupExpense(gid, {
+      title: note.trim() || category,
+      category,
+      date,
+      amountPaise: paise!,
+      ...parts,
+    });
+    return { groupId: gid, expenseId };
+  };
+
   const save = () => {
     if (!canSave) return;
     if (mode === 'owe') return saveOwe();
+    let khata = editing?.khata;
+    if (splitting) {
+      khata = saveSplit();
+      if (!khata) return;
+    }
     saveTx({
       id: editing?.id,
       type,
@@ -163,14 +224,23 @@ export default function AddTx({
       date,
       note: note.trim(),
       necessary: type === 'expense' ? necessary : true,
+      sharedPaise: splitting ? friendShare : editing?.sharedPaise,
+      internal: editing?.internal,
+      khata,
     });
     back('/');
   };
 
   const remove = () => {
     if (!editing) return;
-    if (window.confirm('Delete this transaction?')) {
+    const k = editing.khata;
+    const msg = k
+      ? 'Delete this? The matching entry in Khata is removed too.'
+      : 'Delete this transaction?';
+    if (window.confirm(msg)) {
       deleteTx(editing.id);
+      if (k?.expenseId) deleteGroupExpense(k.groupId, k.expenseId);
+      if (k?.paymentId) deletePayment(k.groupId, k.paymentId);
       back('/');
     }
   };
@@ -190,6 +260,7 @@ export default function AddTx({
         }
       />
       <div className="add-body stack">
+        {!locked && (
         <Segmented
           options={
             editing
@@ -206,6 +277,7 @@ export default function AddTx({
           value={mode}
           onChange={switchMode}
         />
+        )}
 
         <div
           className={`amount-display ${mode === 'owe' ? 'owe' : type}`}
@@ -214,6 +286,12 @@ export default function AddTx({
         >
           ₹{amount || '0'}
         </div>
+
+        {locked && (
+          <div className="notice">
+            This one is linked to Khata, so the amount cannot be changed here. To change it, delete it and add it again.
+          </div>
+        )}
 
         {mode === 'owe' ? (
           <>
@@ -325,6 +403,69 @@ export default function AddTx({
               </div>
             )}
 
+            {mode === 'expense' && !editing && (
+              <>
+                <button
+                  className="btn ghost block"
+                  aria-pressed={splitOn}
+                  style={splitOn ? { borderColor: 'var(--blue)', background: 'var(--blue-soft)' } : undefined}
+                  onClick={() => setSplitOn(!splitOn)}
+                >
+                  <span aria-hidden="true">🤝</span> {splitOn ? 'Splitting with a friend' : 'Split with a friend'}
+                </button>
+
+                {splitOn && (
+                  <div className="card stack" style={{ padding: 12 }}>
+                    {splitPreview && <div className="notice">{splitPreview}</div>}
+                    {splitProblem && <div className="notice bad">{splitProblem}</div>}
+                    <FriendPicker
+                      ledgers={ledgers}
+                      meIds={s.meIds}
+                      value={friend}
+                      onChange={setFriend}
+                      newName={newName}
+                      onNewName={setNewName}
+                    />
+                    <div>
+                      <span className="field-label">How much do they owe?</span>
+                      <div className="seg" role="group" aria-label="How much your friend owes">
+                        <button aria-pressed={splitHow === 'half'} onClick={() => setSplitHow('half')}>
+                          Half
+                        </button>
+                        <button aria-pressed={splitHow === 'full'} onClick={() => setSplitHow('full')}>
+                          All of it
+                        </button>
+                        <button aria-pressed={splitHow === 'custom'} onClick={() => setSplitHow('custom')}>
+                          Custom
+                        </button>
+                      </div>
+                    </div>
+                    {splitHow === 'custom' && (
+                      <label className="field">
+                        <span>{friendName} owes (₹)</span>
+                        <input
+                          className="input"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={customAmt}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) setCustomAmt(v);
+                          }}
+                        />
+                      </label>
+                    )}
+                    {nameUnset && (
+                      <div className="notice">
+                        Your name shows as “{s.settings.userName.trim() || 'Me'}” on your friend’s phone. Set your real
+                        name in <a href="#/more">Profile</a> first.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
             <div className="chips" role="group" aria-label="Category">
               {cats.map((c) => (
                 <button
@@ -381,6 +522,7 @@ export default function AddTx({
               key={k}
               className="key"
               aria-label={k === 'back' ? 'Delete last digit' : k === '.' ? 'Decimal point' : k}
+              disabled={locked}
               onClick={() => setAmount((cur) => pressKey(cur, k))}
             >
               {k === 'back' ? <Icon name="backspace" /> : k}
@@ -389,9 +531,61 @@ export default function AddTx({
         </div>
         <button className="btn primary block" disabled={!canSave} onClick={save}>
           <Icon name="check" />{' '}
-          {editing ? 'Save changes' : mode === 'owe' ? 'Save entry' : type === 'expense' ? 'Save expense' : 'Save income'}
+          {editing
+            ? 'Save changes'
+            : mode === 'owe'
+              ? 'Save entry'
+              : splitting
+                ? 'Save and split'
+                : type === 'expense'
+                  ? 'Save expense'
+                  : 'Save income'}
         </button>
       </div>
     </div>
+  );
+}
+
+/** Friend chips plus a name box for a new friend. */
+function FriendPicker({
+  ledgers,
+  meIds,
+  value,
+  onChange,
+  newName,
+  onNewName,
+}: {
+  ledgers: Group[];
+  meIds: Record<string, string>;
+  value: string;
+  onChange: (v: string) => void;
+  newName: string;
+  onNewName: (v: string) => void;
+}) {
+  return (
+    <>
+      <div>
+        <span className="field-label">With whom?</span>
+        <div className="chips" role="group" aria-label="Friend">
+          {ledgers.map((l) => (
+            <button key={l.id} className="chip blue" aria-pressed={value === l.id} onClick={() => onChange(l.id)}>
+              {otherMember(l, meIds[l.id])?.name ?? l.name}
+            </button>
+          ))}
+          <button className="chip blue" aria-pressed={value === 'new'} onClick={() => onChange('new')}>
+            + New friend
+          </button>
+        </div>
+      </div>
+      {value === 'new' && (
+        <input
+          className="input"
+          aria-label="Friend's name"
+          placeholder="Friend's name"
+          value={newName}
+          onChange={(e) => onNewName(e.target.value)}
+        />
+      )}
+    </>
   );
 }

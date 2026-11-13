@@ -1,4 +1,4 @@
-import type { Group, GroupExpense, ID } from './types';
+import type { Group, GroupExpense, ID, SplitType } from './types';
 import { fmt } from './money';
 import { shortDate } from './util';
 
@@ -192,4 +192,15 @@ export function friendSummary(g: Group, meId: ID, link?: string): string {
   }
   if (link) lines.push('', link);
   return lines.join('\n');
+}
+
+/**
+ * I paid the whole amount and a friend owes me `friendShare` of it.
+ * Always an exact split, so what the app shows and what is saved can never differ by a paisa.
+ */
+export function splitWithFriend(paise: number, friendShare: number, meId: ID, friendId: ID) {
+  const x = Math.min(Math.max(friendShare, 0), paise);
+  const weights: Record<ID, number> = { [friendId]: x };
+  if (paise - x > 0) weights[meId] = paise - x;
+  return { paidBy: { [meId]: paise }, weights, splitType: 'exact' as SplitType };
 }
